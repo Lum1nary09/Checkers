@@ -20,6 +20,33 @@ class Logic
         optimization = (*config)("Bot", "Optimization");
     }
 
+    vector<move_pos> find_best_turns(const bool color) {
+        // Очищаем список следующих ходов
+        next_move.clear();
+        // Очищаем список следующих лучших состояний
+        next_best_state.clear();
+
+        // Осуществляем поиск наилучшего первого хода
+        find_first_best_turn(board->get_board(), color, -1, -1, 0);
+
+        // Начальное состояние
+        int state = 0;
+
+        // Результат (список наилучших ходов)
+        vector<move_pos> res;
+
+        do
+        {
+            // Добавляем следующий ход из текущего состояния
+            res.push_back(next_move[state]);
+            // Переходим в следующее состояние
+            state = next_best_state[state];
+            // Заканчиваем, если текущее состояние или состояние после серии ходов побития становится -1
+        } while (state != -1 && next_move[state].x != -1);
+
+        return res;
+    }
+
 private:
     // Выполнение хода
     vector<vector<POS_T>> make_turn(vector<vector<POS_T>> mtx, move_pos turn) const
@@ -71,9 +98,147 @@ private:
     }
     // Поиск первого лучшего хода
     double find_first_best_turn(vector<vector<POS_T>> mtx, const bool color, const POS_T x, const POS_T y, size_t state,
-                                double alpha = -1)
+                                double alpha = -1){
+        // Добавляем пустой ход
+         next_move.emplace_back(-1, -1, -1, -1);
+ 
+         // Начальное состояние
+         next_best_state.push_back(-1);
+ 
+         // Проверяем состояние (для определения наличия списка ходов)
+         // Если state == 0, значит до этого были побиты фигуры противника и искать ходы не нужно
+         if (state != 0) {
+             // Осуществляем поиск ходов
+             find_turns(x, y, mtx);
+         }
+ 
+         // Копируем список доступных ходов
+         const auto now_turns = turns;
+ 
+         // Копируем значения флага
+         const auto now_have_beats = have_beats;
+ 
+         // Если мы можем побить фигуру противника
+         if (!now_have_beats && state != 0) {
+             // Возвращаем наилучший ход
+             return find_best_turns_rec(mtx, 1 - color, 0, alpha);
+         }
+ 
+         // Наилучший результат на текущий момент
+         double best_score = -1;
+ 
+         // Перебираем доступные ходы
+         for (const auto turn : now_turns) {
+             // Новое состояние
+             const size_t new_state = next_move.size();
+ 
+             // Полученный результат
+             double score;
+ 
+             // Если есть кого бить
+             if (now_have_beats) {
+                 score = find_first_best_turn(make_turn(mtx, turn), color, turn.x2, turn.y2, new_state, best_score);
+             // Если никого не бьем
+             } else {
+                 score = find_best_turns_rec(make_turn(mtx, turn), 1 - color, 0, best_score);
+             }
+ 
+             // Если полученный результат превосходит наилучший
+             if (score > best_score) {
+                 // Обновляем наилучший результат
+                 best_score = score;
+                 next_move[state] = turn;
+                 next_best_state[state] = (now_have_beats ? int(new_state) : -1);
+             }
+         }
+ 
+         return best_score;
+     }
+                                }
     // Рекурсивный поиск хода
     double find_best_turns_rec(vector<vector<POS_T>> mtx, const bool color, const size_t depth, double alpha = -1,
+                                double beta = INF + 1, const POS_T x = -1, const POS_T y = -1) {
+            // Условие выхода из рекурсии
+            if (depth == Max_depth) {
+                // Возвращаем наилучший результат
+                return calc_score(mtx, (depth % 2 == color));
+            }
+    
+            // Если есть серия побитий
+            if (x != -1) {
+                // Ищем ходы от координаты
+                find_turns(x, y, mtx);
+            }
+            else {
+                // Ищем ходы для выбранного цвета игрока
+                find_turns(color, mtx);
+            }
+    
+            // Копируем список доступных ходов
+            const auto now_turns = turns;
+    
+            // Копируем значения флага
+            const bool now_have_beats = have_beats;
+    
+            // Если нет фигур для побития и была серия побитий
+            if (!now_have_beats && x != -1) {
+                // Возвращаем наилучший ход
+                return find_best_turns_rec(mtx, 1 - color, depth + 1, alpha, beta);
+            }
+    
+            // Проверка наличия ходов
+            if (turns.empty()) {
+                // Возвращаем результат игры
+                return (depth % 2 ? 0 : INF);
+            }
+    
+            // Минимальный результат
+            double min_score = INF + 1;
+            // Максимальный результат
+            double max_score = -1;
+    
+            // Перебираем доступные ходы
+            for (const auto turn : now_turns) {
+                // Текущий результат
+                double score = 0.0;
+    
+                // Если есть серия побитий
+                if (now_have_beats) {
+                    // Продолжаем серию побитий
+                    score = find_best_turns_rec(make_turn(mtx, turn), color, depth, alpha, beta, turn.x2, turn.y2);
+                }
+                else {
+                    score = find_best_turns_rec(make_turn(mtx, turn), 1 - color, depth + 1, alpha, beta);
+                }
+    
+                // Обновляем минимум
+                min_score = min(min_score, score);
+                // Обновляем Максимум
+                max_score = max(max_score, score);
+    
+                // Альфа-бета отсечение
+                // Если ход игрока
+                if (depth % 2) {
+                    // Двигаем левую границу
+                    alpha = max(alpha, max_score);
+                // Ход противника
+                } else {
+                    // Двигаем правую границу
+                    beta = min(beta, min_score);
+                }
+    
+                // Оптимизация
+                if (optimization != "O0" && alpha > beta) {
+                    break;
+                }
+                if (optimization == "O2" && alpha == beta) {;
+                    return (depth % 2 ? max_score + 1 : min_score - 1);
+                }
+            }
+    
+            // Возвращаем результат ходившего игрока
+            return (depth % 2 ? max_score : min_score);
+        }
 
 public:
 // Поиск ходов для цвета
