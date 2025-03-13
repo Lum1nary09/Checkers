@@ -8,11 +8,11 @@ using json = nlohmann::json;
 class Config
 {
   public:
-    Config()
+    Config() //Перегрузка оператора.
     {
         reload();
     }
-
+  // Загружаем конфигурацию из настройки.
     void reload()
     {
         std::ifstream fin(project_path + "settings.json");

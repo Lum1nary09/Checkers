@@ -1,9 +1,11 @@
 {
-    "WindowSize": {
+    "WindowSize": { 
+        "_comment": "Задается высота и ширина экрана, при значении - 0 используется полноэкранный режим.",
         "Width": 0,
         "Hight": 0
     },
     "Bot": {
+        "_comment": "Параметры бота. IsWhiteBot - Белые шашки. IsBlackBot - Черные шашки. WhiteBotLevel и BlackBotLevel - выбор уровня сложности бота для цвета. BotScoringType - счетчик очков. BotDelayMS - задержка хода бота. NoRandom - Рандомизация ходов. Optimization - оптимизация ходов",
         "IsWhiteBot": false,
         "IsBlackBot": true,
         "WhiteBotLevel": 0,
@@ -14,6 +16,7 @@
         "Optimization": "O1"
     },
     "Game": {
+        "_comment": "MaxNumTurns - Выбор максимального количества ходов.",
         "MaxNumTurns": 120
     }
 }

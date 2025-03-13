@@ -20,42 +20,65 @@ class Game
     // to start checkers
     int play()
     {
+        // Начинаем отсчет времени игры
         auto start = chrono::steady_clock::now();
+
+        //Условия перезапуска игры
         if (is_replay)
         {
             logic = Logic(&board, &config);
             config.reload();
             board.redraw();
         }
+        // Загрузка поля
         else
         {
             board.start_draw();
         }
+        // Флаг сброса игры
         is_replay = false;
 
+        // Счетчик ходов
         int turn_num = -1;
+        // Флаг выхода из игры
         bool is_quit = false;
+
+        // Максимальное количество ходов
         const int Max_turns = config("Game", "MaxNumTurns");
+
+        // Если текущий ход меньше максимального
         while (++turn_num < Max_turns)
         {
             beat_series = 0;
+
+            // Поиск ходов
             logic.find_turns(turn_num % 2);
+
+            // Если ходов нет, выходим из игры
             if (logic.turns.empty())
                 break;
+
+            // Установка максимальной глубины для выбранного цвета шашек бота
             logic.Max_depth = config("Bot", string((turn_num % 2) ? "Black" : "White") + string("BotLevel"));
+
+            // Выбор очередности хода
             if (!config("Bot", string("Is") + string((turn_num % 2) ? "Black" : "White") + string("Bot")))
             {
+                // Ход игрока
                 auto resp = player_turn(turn_num % 2);
+                // Установка флага выхода из игры
                 if (resp == Response::QUIT)
                 {
                     is_quit = true;
                     break;
                 }
+                // Установка флага сброса игры
                 else if (resp == Response::REPLAY)
                 {
                     is_replay = true;
                     break;
                 }
+                // Отмена последнего хода
                 else if (resp == Response::BACK)
                 {
                     if (config("Bot", string("Is") + string((1 - turn_num % 2) ? "Black" : "White") + string("Bot")) &&
@@ -73,26 +96,36 @@ class Game
                 }
             }
             else
+                // Ход бота
                 bot_turn(turn_num % 2);
         }
         auto end = chrono::steady_clock::now();
+
+        // Логирование процесса игры
         ofstream fout(project_path + "log.txt", ios_base::app);
         fout << "Game time: " << (int)chrono::duration<double, milli>(end - start).count() << " millisec\n";
         fout.close();
 
+        // Начало игры
         if (is_replay)
             return play();
+        // Выход из игры
         if (is_quit)
             return 0;
+        // Результат игры
         int res = 2;
+
+        // Если текущий ход равен максимальному
         if (turn_num == Max_turns)
         {
             res = 0;
         }
+        // Если текущий ход бота
         else if (turn_num % 2)
         {
             res = 1;
         }
+        // Отображение результата игры
         board.show_final(res);
         auto resp = hand.wait();
         if (resp == Response::REPLAY)
@@ -104,6 +137,7 @@ class Game
     }
 
   private:
+    // Ход бота
     void bot_turn(const bool color)
     {
         auto start = chrono::steady_clock::now();
@@ -111,10 +145,12 @@ class Game
         auto delay_ms = config("Bot", "BotDelayMS");
         // new thread for equal delay for each turn
         thread th(SDL_Delay, delay_ms);
+        // Поиск наилучшего хода
         auto turns = logic.find_best_turns(color);
         th.join();
         bool is_first = true;
         // making moves
+        // Обход и выполнение ходов
         for (auto turn : turns)
         {
             if (!is_first)
@@ -123,6 +159,7 @@ class Game
             }
             is_first = false;
             beat_series += (turn.xb != -1);
+            // Перемещение фигуры
             board.move_piece(turn, beat_series);
         }
 
@@ -132,6 +169,7 @@ class Game
         fout.close();
     }
 
+    // Ход игрока
     Response player_turn(const bool color)
     {
         // return 1 if quit
@@ -140,18 +178,25 @@ class Game
         {
             cells.emplace_back(turn.x, turn.y);
         }
+
+        // Подсветка клеток
         board.highlight_cells(cells);
+        // Позиция хода
         move_pos pos = {-1, -1, -1, -1};
         POS_T x = -1, y = -1;
-        // trying to make first move
+
+        // Обработка кликов
         while (true)
         {
+            // Ожидание клика
             auto resp = hand.get_cell();
             if (get<0>(resp) != Response::CELL)
                 return get<0>(resp);
             pair<POS_T, POS_T> cell{get<1>(resp), get<2>(resp)};
 
+            // Флаг корректности хода
             bool is_correct = false;
+            // Проверка корректности ходов
             for (auto turn : logic.turns)
             {
                 if (turn.x == cell.first && turn.y == cell.second)
@@ -196,13 +241,18 @@ class Game
         board.clear_highlight();
         board.clear_active();
         board.move_piece(pos, pos.xb != -1);
+
+        // Если за ход не было побитых шашек, возвращаем ОК
         if (pos.xb == -1)
             return Response::OK;
         // continue beating while can
         beat_series = 1;
+        // Серия ходов
         while (true)
         {
+            // Поиск ходов с текущей позиции
             logic.find_turns(pos.x2, pos.y2);
+            // Если ходов нет - выходим
             if (!logic.have_beats)
                 break;
 
@@ -216,6 +266,7 @@ class Game
             // trying to make move
             while (true)
             {
+                // Ожидание клика
                 auto resp = hand.get_cell();
                 if (get<0>(resp) != Response::CELL)
                     return get<0>(resp);
@@ -250,6 +301,8 @@ class Game
     Board board;
     Hand hand;
     Logic logic;
+    // Количество побитых шашек
     int beat_series;
+    // Флаг сброса игры
     bool is_replay = false;
 };

@@ -5,9 +5,9 @@ typedef int8_t POS_T;
 
 struct move_pos
 {
-    POS_T x, y;             // from
-    POS_T x2, y2;           // to
-    POS_T xb = -1, yb = -1; // beaten
+    POS_T x, y;             // Откуда ходим
+    POS_T x2, y2;           // Куда ходим
+    POS_T xb = -1, yb = -1; // Координата выбывшей фигуры
 
     move_pos(const POS_T x, const POS_T y, const POS_T x2, const POS_T y2) : x(x), y(y), x2(x2), y2(y2)
     {
